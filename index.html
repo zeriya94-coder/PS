@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PAST TENSE: FINGER BLASTER</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- MediaPipe Hands Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <!-- Certificate Generation Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&display=swap');
+        
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            background-color: #030712;
+            color: #ffffff;
+        }
+
+        /* Glassmorphism UI Overlay Panels */
+        .glass-panel {
+            background: rgba(10, 16, 35, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1.5px solid rgba(0, 240, 255, 0.3);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .glass-panel-solid {
+            background: rgba(8, 14, 30, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 2px solid rgba(0, 240, 255, 0.4);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Neon Glow Text Styles */
+        .neon-text-cyan {
+            text-shadow: 0 0 12px rgba(0, 240, 255, 0.8), 0 0 24px rgba(0, 240, 255, 0.5);
+        }
+        
+        .neon-text-yellow {
+            text-shadow: 0 0 12px rgba(255, 215, 0, 0.9), 0 0 24px rgba(255, 215, 0, 0.5);
+        }
+
+        .neon-text-red {
+            text-shadow: 0 0 12px rgba(239, 68, 68, 0.9), 0 0 24px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Action Buttons */
+        .btn-action {
+            background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+            box-shadow: 0 6px 25px rgba(0, 114, 255, 0.5);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .btn-action:hover:not(:disabled) {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 30px rgba(0, 240, 255, 0.8);
+        }
+
+        .btn-action:active:not(:disabled) {
+            transform: translateY(1px) scale(0.98);
+        }
+        
+        .btn-action:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(0.6);
+        }
+
+        /* AR Answer Target Buttons */
+        .target-btn {
+            background: linear-gradient(180deg, rgba(15, 25, 50, 0.82) 0%, rgba(8, 15, 35, 0.92) 100%);
+            border: 3px solid rgba(0, 240, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 20px rgba(0, 240, 255, 0.15);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            will-change: transform;
+        }
+
+        .target-btn.hovered {
+            border-color: #00f0ff;
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.9), inset 0 0 25px rgba(0, 240, 255, 0.3);
+        }
+
+        .target-btn.correct {
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.92) 0%, rgba(5, 122, 85, 0.96) 100%) !important;
+            border-color: #10b981 !important;
+            box-shadow: 0 0 50px rgba(16, 185, 129, 0.95) !important;
+            animation: pulse-success 0.4s infinite alternate;
+        }
+
+        .target-btn.wrong {
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.92) 0%, rgba(153, 27, 27, 0.96) 100%) !important;
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 45px rgba(239, 68, 68, 0.95) !important;
+            animation: shake 0.3s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { margin-left: 0; }
+            20% { margin-left: -12px; }
+            40% { margin-left: 12px; }
+            60% { margin-left: -6px; }
+            80% { margin-left: 6px; }
+        }
+
+        @keyframes pulse-success {
+            from { filter: brightness(1); }
+            to { filter: brightness(1.3); }
+        }
+
+        /* Countdown Ring SVG Circle Animation */
+        .timer-ring-circle {
+            transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        #webcam {
+            transform: scaleX(-1);
+            object-fit: cover;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .ar-mode-active .target-btn {
+            pointer-events: none !important;
+        }
+    </style>
+</head>
+<body class="w-full h-full relative overflow-hidden bg-slate-950 text-white select-none">
+    
+    <!-- BACKGROUND: LIVE MIRRORED PLAYER CAMERA FEED -->
+    <div id="videoContainer" class="absolute inset-0 w-full h-full z-0 overflow-hidden bg-slate-950">
+        <video id="webcam" class="w-full h-full object-cover opacity-85 transition-opacity duration-500" autoplay playsinline muted></video>
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-slate-950/70 pointer-events-none"></div>
+    </div>
+
+    <!-- INTERACTIVE AR GRAPHICS CANVAS -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- UI OVERLAY LAYER CONTAINER -->
+    <div id="uiLayer" class="relative z-10 w-full h-full flex flex-col justify-between p-3 md:p-5 max-w-[1920px] mx-auto ar-mode-active pointer-events-none">
+        
+        <!-- HEADER HUD BAR -->
+        <header id="hudHeader" class="hidden w-full flex items-center justify-between glass-panel rounded-2xl px-4 py-2 md:px-6 md:py-3 border border-cyan-500/30 pointer-events-auto">
+            <!-- Stage Info -->
+            <div class="flex items-center gap-3 w-1/3">
+                <span id="stageBadge" class="bg-cyan-500/20 text-cyan-300 font-extrabold px-3 py-1 rounded-xl border border-cyan-400/40 text-xs md:text-sm tracking-wider uppercase">
+                    Stage 1
+                </span>
+                <span id="stageNameDisplay" class="font-black text-sm md:text-lg text-slate-100 hidden sm:inline">
+                    Rookie Shooter
+                </span>
+            </div>
+
+            <!-- Question & Timer (Center) -->
+            <div class="flex items-center justify-center gap-4 w-1/3">
+                <div class="text-right hidden sm:block">
+                    <div class="text-[10px] md:text-xs text-slate-300 uppercase tracking-widest font-bold">Question</div>
+                    <div id="questionProgress" class="text-base md:text-xl font-black text-cyan-300">1 / 35</div>
+                </div>
+                <div class="relative w-12 h-12 md:w-16 md:h-16 flex items-center justify-center">
+                    <svg class="w-full h-full">
+                        <circle class="text-slate-800/80" stroke-width="5" stroke="currentColor" fill="transparent" r="22" cx="50%" cy="50%"/>
+                        <circle id="timerCircle" class="timer-ring-circle text-yellow-400" stroke-width="5" stroke-linecap="round" stroke="currentColor" fill="transparent" r="22" cx="50%" cy="50%" stroke-dasharray="138.2" stroke-dashoffset="0"/>
+                    </svg>
+                    <span id="timerText" class="absolute font-black text-base md:text-2xl text-yellow-400 neon-text-yellow">10</span>
+                </div>
+            </div>
+
+            <!-- Score & End Game (Right) -->
+            <div class="flex items-center justify-end gap-3 w-1/3">
+                <div class="text-right">
+                    <div class="text-[10px] md:text-xs text-slate-300 uppercase tracking-widest font-bold">Score</div>
+                    <div id="scoreDisplay" class="text-base md:text-xl font-black text-cyan-400 neon-text-cyan">0</div>
+                </div>
+                <!-- END GAME BUTTON -->
+                <button id="endGameBtn" class="bg-red-900/60 border-2 border-red-500 hover:bg-red-500 hover:text-white text-red-200 font-black px-3 py-1.5 md:py-2 md:px-4 rounded-xl text-xs md:text-sm uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(239,68,68,0.4)] ml-2">
+                    End Game
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN SCREEN CONTAINER -->
+        <main id="mainContainer" class="flex-1 flex flex-col justify-center items-center my-auto w-full relative pointer-events-auto">
+            
+            <!-- SCREEN 1: START SCREEN -->
+            <div id="startScreen" class="w-full max-w-2xl glass-panel-solid rounded-3xl p-6 md:p-10 text-center flex flex-col items-center gap-5 my-auto shadow-2xl">
+                <div class="inline-block bg-cyan-500/20 border border-cyan-400/40 px-4 py-1.5 rounded-full text-cyan-300 font-extrabold text-xs md:text-sm tracking-widest uppercase">
+                    CEFR A1-A2 • Malaysian Year 5 English
+                </div>
+
+                <div class="space-y-1">
+                    <h1 class="text-3xl md:text-6xl font-black tracking-tight text-white drop-shadow-md">
+                        PAST TENSE <span class="text-cyan-400 neon-text-cyan block sm:inline">FINGER BLASTER</span>
+                    </h1>
+                    <p class="text-xs md:text-base text-cyan-200/90 font-bold tracking-widest uppercase">LIVE CAMERA AR • AIM • SHOOT • LEARN</p>
+                </div>
+
+                <div class="w-full max-w-sm">
+                    <label class="block text-xs uppercase tracking-widest text-slate-300 mb-1.5 font-bold text-left">Pupil Name (For Certificate):</label>
+                    <input type="text" id="playerNameInput" value="" maxlength="20" placeholder="Enter Your Name" class="w-full bg-slate-900/90 border-2 border-cyan-500/50 rounded-xl px-4 py-2.5 text-center text-lg font-black text-cyan-300 focus:outline-none focus:border-cyan-400 transition-all">
+                </div>
+
+                <div class="flex items-center justify-center gap-3 w-full max-w-md">
+                    <button id="modeArBtn" class="flex-1 py-3 px-3 rounded-xl border-2 border-cyan-400 bg-cyan-500/30 text-cyan-300 font-extrabold text-xs md:text-sm flex items-center justify-center gap-2 transition-all shadow-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        AR Camera Mode
+                    </button>
+                    <button id="modeTouchBtn" class="flex-1 py-3 px-3 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-400 font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                        Touch / Mouse Mode
+                    </button>
+                </div>
+
+                <div class="w-full max-w-md pt-2">
+                    <button id="startGameBtn" class="btn-action w-full py-4 px-6 rounded-2xl text-xl font-black text-white tracking-wider uppercase shadow-xl flex items-center justify-center gap-2">
+                        <span id="startGameText">START GAME</span>
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCREEN 2: LIVE TUTORIAL SCREEN -->
+            <div id="tutorialScreen" class="hidden w-full max-w-2xl glass-panel-solid rounded-3xl p-6 md:p-8 text-center flex flex-col items-center gap-5 my-auto shadow-2xl border border-cyan-400/40">
+                <div class="space-y-1">
+                    <h2 class="text-2xl md:text-3xl font-black text-white">SHOW YOUR FACE & HAND!</h2>
+                    <p class="text-slate-200 text-xs md:text-sm font-semibold max-w-md mx-auto">Make a finger gun gesture, aim at the target, and pull your thumb down to shoot!</p>
+                </div>
+                <div class="w-full max-w-md bg-slate-900/80 rounded-2xl p-5 border-2 border-cyan-500/40 flex flex-col items-center justify-center min-h-[180px] relative overflow-hidden shadow-inner">
+                    <div id="tutorialDiagram" class="text-7xl my-1 transform transition-transform hover:scale-110">🎯</div>
+                    <div id="tutorialFeedback" class="text-sm font-black text-yellow-400 tracking-wide mt-2">AIM & FIRE!</div>
+                </div>
+                <button id="skipTutorialBtn" class="mt-2 text-xs font-black text-slate-400 hover:text-white uppercase tracking-wider bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">Skip Tutorial ➔</button>
+            </div>
+
+            <!-- SCREEN 3: STAGE INTRO COUNTDOWN -->
+            <div id="stageIntroScreen" class="hidden w-full max-w-xl glass-panel-solid rounded-3xl p-8 text-center flex flex-col items-center gap-6 my-auto shadow-2xl">
+                <div id="stageIntroBadge" class="bg-cyan-500/20 text-cyan-300 font-black px-4 py-1.5 rounded-full border border-cyan-400/40 text-xs md:text-sm uppercase tracking-widest">STAGE 1 OF 7</div>
+                <div>
+                    <h2 id="stageIntroTitle" class="text-3xl md:text-5xl font-black text-white mb-2 transition-colors duration-300">ROOKIE SHOOTER</h2>
+                    <p id="stageIntroFocus" class="text-cyan-300 text-sm md:text-lg font-bold transition-colors duration-300">Grammar Focus: Regular Past Tense</p>
+                </div>
+                <div class="my-2">
+                    <div id="stageIntroStatus" class="text-lg md:text-xl font-black text-yellow-400 uppercase tracking-widest mb-1">GET READY!</div>
+                    <div id="stageCountdownNum" class="text-7xl md:text-9xl font-black text-cyan-400 neon-text-cyan">3</div>
+                </div>
+            </div>
+
+            <!-- SCREEN 4: GAMEPLAY - FALLING TARGETS AREA -->
+            <div id="gameplayScreen" class="hidden w-full h-full flex flex-col items-center flex-1 max-w-6xl px-2 py-4 relative pointer-events-none">
+                
+                <!-- Fixed Question Banner at Top -->
+                <div class="w-full glass-panel rounded-3xl p-5 md:p-6 text-center border-2 border-cyan-400/50 shadow-2xl relative z-30 backdrop-blur-md pointer-events-auto shrink-0 mb-4">
+                    <div id="questionText" class="text-xl md:text-3xl lg:text-4xl font-black text-white leading-tight tracking-tight drop-shadow-md px-2">
+                        Yesterday, I ___ football.
+                    </div>
+                </div>
+
+                <!-- Animated Falling Targets Field -->
+                <div id="targetsContainer" class="relative w-full flex-1 overflow-hidden z-20 pointer-events-auto border-x border-b border-cyan-500/10 rounded-b-3xl bg-slate-900/10 backdrop-blur-[2px]">
+                    
+                    <!-- Target Lane A (Left) -->
+                    <button data-index="0" class="target-btn absolute w-[31%] left-[1%] top-[-200px] rounded-2xl p-3 md:p-6 flex flex-col items-center justify-center text-center min-h-[100px] md:min-h-[130px]">
+                        <span class="text-[9px] md:text-xs uppercase font-black text-cyan-400/80 mb-1 tracking-widest">TARGET A</span>
+                        <span class="target-text text-lg md:text-2xl lg:text-3xl font-black text-white break-words">played</span>
+                    </button>
+
+                    <!-- Target Lane B (Center) -->
+                    <button data-index="1" class="target-btn absolute w-[31%] left-[34.5%] top-[-200px] rounded-2xl p-3 md:p-6 flex flex-col items-center justify-center text-center min-h-[100px] md:min-h-[130px]">
+                        <span class="text-[9px] md:text-xs uppercase font-black text-cyan-400/80 mb-1 tracking-widest">TARGET B</span>
+                        <span class="target-text text-lg md:text-2xl lg:text-3xl font-black text-white break-words">play</span>
+                    </button>
+
+                    <!-- Target Lane C (Right) -->
+                    <button data-index="2" class="target-btn absolute w-[31%] left-[68%] top-[-200px] rounded-2xl p-3 md:p-6 flex flex-col items-center justify-center text-center min-h-[100px] md:min-h-[130px]">
+                        <span class="text-[9px] md:text-xs uppercase font-black text-cyan-400/80 mb-1 tracking-widest">TARGET C</span>
+                        <span class="target-text text-lg md:text-2xl lg:text-3xl font-black text-white break-words">playing</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCREEN 5: STAGE COMPLETE SCREEN -->
+            <div id="stageCompleteScreen" class="hidden w-full max-w-xl glass-panel-solid rounded-3xl p-8 text-center flex flex-col items-center gap-6 my-auto shadow-2xl">
+                <div class="text-6xl">🏆</div>
+                <h2 class="text-3xl md:text-5xl font-black text-white">STAGE CLEARED!</h2>
+                <div class="bg-slate-900/90 rounded-2xl p-6 w-full border border-cyan-500/40 space-y-3">
+                    <div class="flex justify-between text-base md:text-lg font-extrabold">
+                        <span class="text-slate-300">Stage Score:</span>
+                        <span id="stageScoreAdd" class="text-yellow-400">+500</span>
+                    </div>
+                    <div class="flex justify-between text-base md:text-lg font-extrabold border-t border-slate-800 pt-2">
+                        <span class="text-slate-200">Total Score:</span>
+                        <span id="stageTotalScore" class="text-2xl font-black text-cyan-400">500</span>
+                    </div>
+                </div>
+                <button id="nextStageBtn" class="btn-action w-full py-4 px-8 rounded-2xl text-xl font-black text-white tracking-wider uppercase">
+                    CONTINUE TO NEXT STAGE
+                </button>
+            </div>
+
+            <!-- SCREEN 6: FINAL RESULTS & CERTIFICATE SCREEN -->
+            <div id="resultsScreen" class="hidden w-full max-w-3xl glass-panel-solid rounded-3xl p-6 md:p-8 text-center flex flex-col items-center gap-4 my-auto shadow-2xl z-40 max-h-[90vh] overflow-y-auto">
+                <div class="space-y-1">
+                    <div id="resMissionSub" class="text-xs uppercase tracking-widest font-black text-cyan-400">Mission Report</div>
+                    <h1 id="resMissionTitle" class="text-3xl md:text-4xl font-black text-white tracking-tight">MISSION COMPLETED!</h1>
+                </div>
+
+                <!-- Rank Card -->
+                <div class="w-full bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-cyan-950/80 border-2 border-cyan-400/60 rounded-2xl p-4 flex flex-col items-center">
+                    <span id="finalRankTitle" class="text-2xl md:text-3xl font-black text-yellow-400 neon-text-yellow mb-1">PAST TENSE MASTER</span>
+                    <span id="finalRankSub" class="text-xs md:text-sm text-cyan-200 font-bold">Outstanding Grammar Shooter!</span>
+                </div>
+
+                <!-- Google Sheets Save Status -->
+                <div class="w-full bg-slate-900/90 px-5 py-3 rounded-xl border border-slate-700 flex justify-between items-center relative overflow-hidden">
+                    <div class="absolute left-0 top-0 bottom-0 w-1 bg-yellow-500" id="saveStatusBorder"></div>
+                    <span class="text-xs md:text-sm text-slate-400 font-bold uppercase tracking-widest">Google Sheets</span>
+                    <div class="flex items-center gap-2">
+                        <span id="saveStatusIndicator" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                        <span id="saveStatusText" class="text-sm md:text-base font-black text-yellow-400 tracking-widest">SAVING...</span>
+                    </div>
+                </div>
+                <button id="retrySaveBtn" class="hidden bg-orange-600 hover:bg-orange-500 border border-orange-400 w-full py-2.5 rounded-xl text-xs md:text-sm font-black text-white tracking-wider uppercase transition-all shadow-[0_0_15px_rgba(234,88,12,0.4)] flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Retry Saving Results
+                </button>
+
+                <!-- Detailed Stats Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 w-full text-left">
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Player</div>
+                        <div id="resPlayerName" class="text-sm md:text-lg font-black text-white truncate">Pupil</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Score</div>
+                        <div id="resTotalScore" class="text-sm md:text-lg font-black text-cyan-400">0</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Accuracy</div>
+                        <div id="resAccuracy" class="text-sm md:text-lg font-black text-emerald-400">0%</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Correct</div>
+                        <div id="resCorrect" class="text-sm md:text-lg font-black text-yellow-400">0 / 35</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Stages</div>
+                        <div id="resStages" class="text-sm md:text-lg font-black text-purple-400">1 / 7</div>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] md:text-xs text-slate-400 font-bold uppercase">Status</div>
+                        <div id="resStatus" class="text-sm md:text-lg font-black text-white">COMPLETED</div>
+                    </div>
+                </div>
+
+                <!-- Certificate & Action Buttons -->
+                <div class="flex flex-col gap-2.5 w-full mt-2">
+                    <div class="flex gap-3 w-full">
+                        <button id="dlPdfBtn" class="btn-action flex-1 py-3 px-3 rounded-xl text-xs md:text-sm font-black text-white tracking-wider uppercase flex items-center justify-center gap-2">
+                            <span>⬇️ PDF Cert</span>
+                        </button>
+                        <button id="dlPngBtn" class="bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 flex-1 py-3 px-3 rounded-xl text-xs md:text-sm font-black text-white tracking-wider uppercase transition-all shadow-[0_0_15px_rgba(79,70,229,0.5)] flex items-center justify-center gap-2">
+                            <span>⬇️ Image Cert</span>
+                        </button>
+                    </div>
+                    <div class="flex gap-3 w-full">
+                        <button id="playAgainBtn" class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 flex-1 py-3 rounded-xl text-xs md:text-sm font-black text-white tracking-wider uppercase transition-all">Play Again</button>
+                        <button id="backHomeBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex-1 py-3 rounded-xl text-xs md:text-sm font-black tracking-wider uppercase transition-all">Main Menu</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER HUD BAR -->
+        <footer id="hudFooter" class="w-full glass-panel rounded-2xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 border border-cyan-500/30 text-xs font-extrabold text-slate-200 pointer-events-auto">
+            <div class="flex items-center gap-2.5">
+                <span id="gestureStatusDot" class="w-3.5 h-3.5 rounded-full bg-red-500 shadow-md"></span>
+                <span id="gestureStatusText" class="uppercase tracking-wider text-slate-200">NO HAND DETECTED</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- END GAME CONFIRMATION MODAL -->
+    <div id="endGameModal" class="fixed inset-0 z-[60] bg-slate-950/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="glass-panel-solid w-full max-w-sm rounded-3xl p-8 text-center border-2 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)]">
+            <div class="text-5xl mb-4">⚠️</div>
+            <h3 class="text-3xl font-black text-white mb-2 tracking-tight">END GAME?</h3>
+            <p class="text-slate-300 text-sm mb-8 font-semibold">Do you want to finish your game early and view your results?</p>
+            <div class="flex flex-col gap-3">
+                <button id="confirmEndBtn" class="modal-btn w-full py-3.5 rounded-xl font-black uppercase text-white tracking-wider border-2 border-red-500 bg-red-600 hover:bg-red-500 transition-all shadow-lg">
+                    YES, END GAME
+                </button>
+                <button id="cancelEndBtn" class="modal-btn w-full py-3.5 rounded-xl font-black uppercase text-slate-300 tracking-wider bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-all">
+                    CANCEL (Return to Game)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HIDDEN CERTIFICATE DOM TEMPLATE FOR HTML2CANVAS GENERATION -->
+    <div id="certContainer" class="fixed top-[-9999px] left-[-9999px] opacity-0 pointer-events-none z-[-100]">
+        <div id="certificateNode" class="w-[1123px] h-[794px] bg-[#030712] border-[20px] border-[#00f0ff] p-12 text-white relative flex flex-col" style="font-family: 'Outfit', sans-serif;">
+            
+            <div class="absolute inset-0 m-5 border-[6px] border-[#ffd700] p-10 flex flex-col items-center justify-center z-10 pointer-events-none"></div>
+            <div class="absolute inset-0 flex items-center justify-center overflow-hidden z-0">
+                <div class="text-[180px] font-black text-cyan-500 opacity-[0.04] leading-none whitespace-nowrap rotate-[-15deg]">FINGER BLASTER</div>
+            </div>
+            
+            <div class="relative z-20 flex-1 flex flex-col items-center justify-center text-center w-full px-16 pt-10">
+                <div class="text-[#ffd700] text-7xl mb-4 drop-shadow-[0_0_15px_rgba(255,215,0,0.5)]">🏆</div>
+                <h1 class="text-6xl font-black text-cyan-400 tracking-widest uppercase mb-1">CERTIFICATE OF ACHIEVEMENT</h1>
+                <h2 class="text-2xl font-bold text-slate-300 tracking-[0.3em] uppercase mb-12">Past Tense: Finger Blaster</h2>
+                
+                <p class="text-2xl text-slate-300 font-semibold mb-6">This certificate is proudly presented to</p>
+                <div id="certPlayerName" class="text-7xl font-black text-[#ffd700] uppercase tracking-wider mb-12 drop-shadow-md border-b-4 border-cyan-500/50 pb-4 px-16 inline-block max-w-[900px] truncate">
+                    PUPIL NAME
+                </div>
+                
+                <p class="text-xl text-slate-200 font-medium mb-12 max-w-4xl mx-auto leading-relaxed">
+                    For participating in the Past Tense Finger Blaster English Grammar Challenge, demonstrating skill, accuracy, and outstanding educational marksmanship.
+                </p>
+                
+                <div class="flex justify-center gap-8 w-full mb-10">
+                    <div class="bg-slate-900 border-2 border-cyan-500 rounded-2xl p-6 w-[220px] shadow-[0_0_20px_rgba(0,240,255,0.2)]">
+                        <div class="text-cyan-400 text-sm font-black uppercase tracking-widest mb-2">Total Score</div>
+                        <div id="certScore" class="text-5xl font-black text-white">2500</div>
+                    </div>
+                    <div class="bg-slate-900 border-2 border-[#ffd700] rounded-2xl p-6 w-[220px] shadow-[0_0_20px_rgba(255,215,0,0.2)]">
+                        <div class="text-[#ffd700] text-sm font-black uppercase tracking-widest mb-2">Correct Answers</div>
+                        <div id="certCorrect" class="text-5xl font-black text-white">35/35</div>
+                    </div>
+                    <div class="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-6 w-[220px] shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                        <div class="text-emerald-400 text-sm font-black uppercase tracking-widest mb-2">Stages Reached</div>
+                        <div id="certStages" class="text-5xl font-black text-white">7/7</div>
+                    </div>
+                    <div class="bg-slate-900 border-2 border-purple-500 rounded-2xl p-6 w-[220px] shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+                        <div class="text-purple-400 text-sm font-black uppercase tracking-widest mb-2">Status</div>
+                        <div id="certStatus" class="text-3xl font-black text-white pt-2">COMPLETED</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="relative z-20 flex justify-between items-end w-full px-16 pb-8 text-sm font-bold text-slate-400 tracking-widest uppercase">
+                <div>Awarded On: <span id="certDate" class="text-white">DD/MM/YYYY</span></div>
+                <div class="text-cyan-500">Keep Learning • Keep Improving • Keep Shining!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC SCRIPT -->
+    <script>
+        // ==========================================
+        // GOOGLE APPS SCRIPT WEB APP URL
+        // ==========================================
+        const GOOGLE_SCRIPT_WEB_APP_URL = ""; 
+        // ==========================================
+
+        // Web Audio API Sound Synthesizer
+        class WebAudioSynth {
+            constructor() {
+                this.ctx = null;
+                this.volume = 0.5;
+            }
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            playBeep(freq = 440, duration = 0.1, type = 'sine') {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(this.volume * 0.4, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e){}
+            }
+            playLaser() {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(900, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(this.volume * 0.5, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e){}
+            }
+            playCorrect() {
+                if (!this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+                        gain.gain.setValueAtTime(this.volume * 0.5, now + idx * 0.06);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.06);
+                        osc.stop(now + idx * 0.06 + 0.25);
+                    });
+                } catch(e){}
+            }
+            playWrong() {
+                if (!this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.25);
+                    gain.gain.setValueAtTime(this.volume * 0.6, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } catch(e){}
+            }
+            playTick() { this.playBeep(900, 0.04, 'square'); }
+            playTimesUp() { this.playBeep(200, 0.4, 'sawtooth'); }
+            playStageComplete() {
+                if (!this.ctx) return;
+                const notes = [440, 554.37, 659.25, 880];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => this.playBeep(freq, 0.2, 'sine'), idx * 120);
+                });
+            }
+            playBossIntro() {
+                if (!this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    [150, 100, 75, 50].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.4);
+                        osc.frequency.exponentialRampToValueAtTime(freq/2, now + idx * 0.4 + 0.3);
+                        gain.gain.setValueAtTime(this.volume * 0.8, now + idx * 0.4);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.4 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now + idx * 0.4);
+                        osc.stop(now + idx * 0.4 + 0.3);
+                    });
+                } catch(e){}
+            }
+        }
+
+        const QUESTION_BANK = [
+            { stage: 1, stageName: "Rookie Shooter", grammarFocus: "Regular Past Tense", questions: [
+                { q: "Yesterday, I ___ football.", choices: ["played", "play", "playing"], correct: 0 },
+                { q: "She ___ her room last Saturday.", choices: ["cleans", "cleaned", "cleaning"], correct: 1 },
+                { q: "We ___ TV last night.", choices: ["watched", "watch", "watches"], correct: 0 },
+                { q: "Tom ___ to school yesterday.", choices: ["walks", "walk", "walked"], correct: 2 },
+                { q: "They ___ their grandma last weekend.", choices: ["visiting", "visited", "visit"], correct: 1 }
+            ]},
+            { stage: 2, stageName: "Time Traveller", grammarFocus: "Irregular Past Tense", questions: [
+                { q: "I ___ rice yesterday.", choices: ["eat", "ate", "eats"], correct: 1 },
+                { q: "She ___ to the park last Sunday.", choices: ["went", "go", "goes"], correct: 0 },
+                { q: "We ___ a bird in the garden yesterday.", choices: ["see", "seen", "saw"], correct: 2 },
+                { q: "My dad ___ a new bag last week.", choices: ["bought", "buy", "buys"], correct: 0 },
+                { q: "The pupils ___ home at two o’clock yesterday.", choices: ["come", "came", "comes"], correct: 1 }
+            ]},
+            { stage: 3, stageName: "Grammar Defender", grammarFocus: "Negative Past Tense", questions: [
+                { q: "I ___ eat breakfast yesterday.", choices: ["don’t", "didn’t", "doesn’t"], correct: 1 },
+                { q: "He ___ watch TV last night.", choices: ["doesn’t", "isn’t", "didn’t"], correct: 2 },
+                { q: "We ___ go to the library yesterday.", choices: ["didn’t", "don’t", "weren’t"], correct: 0 },
+                { q: "Sara ___ finish her homework yesterday.", choices: ["doesn’t", "didn’t", "hasn’t"], correct: 1 },
+                { q: "They ___ play badminton last Saturday.", choices: ["aren’t", "don’t", "didn’t"], correct: 2 }
+            ]},
+            { stage: 4, stageName: "Question Hunter", grammarFocus: "Past Tense Questions", questions: [
+                { q: "___ you visit the zoo yesterday?", choices: ["Do", "Did", "Does"], correct: 1 },
+                { q: "Where ___ she go last Sunday?", choices: ["did", "does", "is"], correct: 0 },
+                { q: "___ the children tired after the match?", choices: ["Was", "Did", "Were"], correct: 2 },
+                { q: "___ he at home last night?", choices: ["Was", "Were", "Did"], correct: 0 },
+                { q: "When ___ they finish the game yesterday?", choices: ["do", "did", "are"], correct: 1 }
+            ]},
+            { stage: 5, stageName: "Grammar Gauntlet", grammarFocus: "Mixed Past Tense", questions: [
+                { q: "Yesterday, Ali ___ his bike to school.", choices: ["ride", "rode", "ridden"], correct: 1 },
+                { q: "My friends ___ at the playground yesterday.", choices: ["was", "are", "were"], correct: 2 },
+                { q: "Nina didn’t ___ her pencil case to school yesterday.", choices: ["bring", "brought", "brings"], correct: 0 },
+                { q: "___ your mum make a cake last night?", choices: ["Does", "Did", "Was"], correct: 1 },
+                { q: "We ___ very happy at the party yesterday.", choices: ["was", "are", "were"], correct: 2 }
+            ]},
+            { stage: 6, stageName: "Sentence Sniper", grammarFocus: "Sentence Grammar", questions: [
+                { q: "Mia ___ to school yesterday because she was ill.", choices: ["didn’t go", "didn’t went", "doesn’t went"], correct: 0 },
+                { q: "Did your brother ___ the film last night?", choices: ["watched", "watch", "watches"], correct: 1 },
+                { q: "We ___ late for the bus yesterday.", choices: ["was", "are", "were"], correct: 2 },
+                { q: "My dad ___ a cake for my birthday last week.", choices: ["made", "make", "makes"], correct: 0 },
+                { q: "They didn’t ___ any photos during the trip.", choices: ["took", "take", "taken"], correct: 1 }
+            ]},
+            { stage: 7, stageName: "Ultimate Boss", grammarFocus: "Advanced Mixed Past Tense", questions: [
+                { q: "Last Saturday, Hana ___ her homework before she went to the park.", choices: ["finishes", "finished", "finishing"], correct: 1 },
+                { q: "The boys ___ a lost puppy and took it home yesterday.", choices: ["found", "find", "finding"], correct: 0 },
+                { q: "Sara ___ at the library yesterday, but her friends ___ at the park.", choices: ["were / was", "is / are", "was / were"], correct: 2 },
+                { q: "Which sentence is correct?", choices: ["We didn’t saw the show last night.", "We didn’t see the show last night.", "We don’t saw the show last night."], correct: 1 },
+                { q: "Yesterday, Adam ___ his lunch before he ___ to football practice.", choices: ["eat / went", "ate / go", "ate / went"], correct: 2 }
+            ]}
+        ];
+
+        const audio = new WebAudioSynth();
+        const MAX_QUESTIONS_TOTAL = 35;
+        const TOTAL_STAGES = 7;
+
+        const state = {
+            mode: 'AR', 
+            playerName: "Pupil",
+            currentStageIdx: 0,
+            currentQuestionIdx: 0,
+            activeCorrectIndex: 0, // Randomized per question
+            score: 0,
+            correctCount: 0,
+            totalAttempts: 0,
+            attemptedCurrentQuestion: false,
+            timer: 10,
+            timerInterval: null,
+            questionActive: false,
+            isPaused: false,
+            endedEarly: false,
+            
+            // Session and Sheet Save Data
+            sessionId: null,
+            saveDataPending: null,
+
+            // Hand tracking
+            handDetected: false,
+            cursor: { x: -100, y: -100 },
+            smoothedCursor: { x: 0.5, y: 0.5 },
+            gestureState: 'NO_HAND',
+            triggerThreshold: 0.53,
+            triggerReleased: true,
+            lastShotTime: 0,
+            
+            // Falling Targets State
+            targetSpeed: 0,
+            targetsData: [
+                {y: -200, active: false},
+                {y: -200, active: false},
+                {y: -200, active: false}
+            ],
+            
+            // Visuals
+            lasers: [],
+            particles: [],
+            floatingTexts: []
+        };
+
+        const elems = {
+            webcam: document.getElementById('webcam'),
+            gameCanvas: document.getElementById('gameCanvas'),
+            uiLayer: document.getElementById('uiLayer'),
+            hudHeader: document.getElementById('hudHeader'),
+            hudFooter: document.getElementById('hudFooter'),
+            
+            startScreen: document.getElementById('startScreen'),
+            tutorialScreen: document.getElementById('tutorialScreen'),
+            stageIntroScreen: document.getElementById('stageIntroScreen'),
+            gameplayScreen: document.getElementById('gameplayScreen'),
+            stageCompleteScreen: document.getElementById('stageCompleteScreen'),
+            resultsScreen: document.getElementById('resultsScreen'),
+            
+            endGameModal: document.getElementById('endGameModal'),
+            targetsContainer: document.getElementById('targetsContainer'),
+            targetBtns: document.querySelectorAll('.target-btn'),
+            
+            questionText: document.getElementById('questionText'),
+            scoreDisplay: document.getElementById('scoreDisplay'),
+            timerText: document.getElementById('timerText'),
+            timerCircle: document.getElementById('timerCircle'),
+            
+            gestureStatusDot: document.getElementById('gestureStatusDot'),
+            gestureStatusText: document.getElementById('gestureStatusText'),
+            
+            playerNameInput: document.getElementById('playerNameInput'),
+
+            saveStatusIndicator: document.getElementById('saveStatusIndicator'),
+            saveStatusText: document.getElementById('saveStatusText'),
+            saveStatusBorder: document.getElementById('saveStatusBorder'),
+            retrySaveBtn: document.getElementById('retrySaveBtn')
+        };
+
+        let canvasCtx = elems.gameCanvas.getContext('2d');
+        function resizeCanvas() {
+            elems.gameCanvas.width = window.innerWidth;
+            elems.gameCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let handsEngine = null;
+        let cameraUtils = null;
+
+        function generateSessionId() {
+            return 'SESSION-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        }
+
+        async function startARMode() {
+            const startText = document.getElementById('startGameText');
+            const startBtn = document.getElementById('startGameBtn');
+            startText.textContent = "ACTIVATING CAMERA...";
+            startBtn.disabled = true;
+
+            try {
+                if (!handsEngine) {
+                    handsEngine = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+                    handsEngine.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+                    handsEngine.onResults(onHandResults);
+                }
+                if (!cameraUtils) {
+                    cameraUtils = new Camera(elems.webcam, {
+                        onFrame: async () => { if (state.mode === 'AR') await handsEngine.send({ image: elems.webcam }); },
+                        width: 1280, height: 720
+                    });
+                }
+                await cameraUtils.start();
+                startText.textContent = "START GAME";
+                startBtn.disabled = false;
+                startTutorial();
+            } catch (err) {
+                console.error(err);
+                startText.textContent = "START GAME";
+                startBtn.disabled = false;
+                alert("Camera blocked. Falling back to Touch/Mouse mode.");
+                setMode('TOUCH');
+                startStageSequence(0);
+            }
+        }
+
+        function onHandResults(results) {
+            if (state.mode !== 'AR') return;
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                state.handDetected = true;
+                const rawX = 1.0 - landmarks[8].x;
+                const rawY = landmarks[8].y;
+                const alpha = 0.65;
+                state.smoothedCursor.x = state.smoothedCursor.x * alpha + rawX * (1 - alpha);
+                state.smoothedCursor.y = state.smoothedCursor.y * alpha + rawY * (1 - alpha);
+                state.cursor.x = state.smoothedCursor.x * window.innerWidth;
+                state.cursor.y = state.smoothedCursor.y * window.innerHeight;
+
+                const isFingerGun = checkFingerGunPose(landmarks);
+                if (isFingerGun) {
+                    const palmSize = Math.hypot(landmarks[0].x - landmarks[9].x, landmarks[0].y - landmarks[9].y);
+                    const thumbDistRatio = Math.hypot(landmarks[4].x - landmarks[5].x, landmarks[4].y - landmarks[5].y) / (palmSize || 1);
+                    const now = performance.now();
+                    if (thumbDistRatio > state.triggerThreshold + 0.08) state.triggerReleased = true;
+                    
+                    if (thumbDistRatio < state.triggerThreshold && state.triggerReleased && (now - state.lastShotTime > 350)) {
+                        state.gestureState = 'TRIGGER_PRESSED';
+                        state.triggerReleased = false;
+                        state.lastShotTime = now;
+                        triggerShot(state.cursor.x, state.cursor.y);
+                    } else if (!state.triggerReleased) {
+                        state.gestureState = 'SHOT_FIRED';
+                    } else {
+                        state.gestureState = 'AIMING';
+                    }
+                } else {
+                    state.gestureState = 'READY';
+                }
+                updateGestureHUD();
+            } else {
+                state.handDetected = false;
+                state.gestureState = 'NO_HAND';
+                updateGestureHUD();
+            }
+        }
+
+        function checkFingerGunPose(lm) {
+            const indexDist = Math.hypot(lm[8].x - lm[0].x, lm[8].y - lm[0].y);
+            const indexPipDist = Math.hypot(lm[6].x - lm[0].x, lm[6].y - lm[0].y);
+            const indexExtended = indexDist > indexPipDist * 1.1;
+            const middleFolded = Math.hypot(lm[12].x - lm[0].x, lm[12].y - lm[0].y) < Math.hypot(lm[9].x - lm[0].x, lm[9].y - lm[0].y) * 1.25;
+            const ringFolded = Math.hypot(lm[16].x - lm[0].x, lm[16].y - lm[0].y) < Math.hypot(lm[13].x - lm[0].x, lm[13].y - lm[0].y) * 1.25;
+            const pinkyFolded = Math.hypot(lm[20].x - lm[0].x, lm[20].y - lm[0].y) < Math.hypot(lm[17].x - lm[0].x, lm[17].y - lm[0].y) * 1.25;
+            return indexExtended && middleFolded && ringFolded && pinkyFolded;
+        }
+
+        function updateGestureHUD() {
+            if (state.mode === 'TOUCH') {
+                elems.gestureStatusDot.className = "w-3.5 h-3.5 rounded-full bg-emerald-400";
+                elems.gestureStatusText.textContent = "TOUCH / MOUSE MODE";
+                return;
+            }
+            switch(state.gestureState) {
+                case 'NO_HAND':
+                    elems.gestureStatusDot.className = "w-3.5 h-3.5 rounded-full bg-red-500 animate-pulse";
+                    elems.gestureStatusText.textContent = "SHOW YOUR FACE & HAND!";
+                    break;
+                case 'READY':
+                    elems.gestureStatusDot.className = "w-3.5 h-3.5 rounded-full bg-yellow-400";
+                    elems.gestureStatusText.textContent = "MAKE A FINGER GUN! 👉";
+                    break;
+                case 'AIMING':
+                    elems.gestureStatusDot.className = "w-3.5 h-3.5 rounded-full bg-cyan-400";
+                    elems.gestureStatusText.textContent = "AIMING • PRESS THUMB TO SHOOT 💥";
+                    break;
+                case 'TRIGGER_PRESSED':
+                case 'SHOT_FIRED':
+                    elems.gestureStatusDot.className = "w-3.5 h-3.5 rounded-full bg-emerald-400";
+                    elems.gestureStatusText.textContent = "SHOT FIRED! 💥";
+                    break;
+            }
+        }
+
+        // TOUCH/MOUSE Fallback
+        window.addEventListener('mousemove', (e) => {
+            if (state.mode === 'TOUCH') {
+                state.cursor.x = e.clientX;
+                state.cursor.y = e.clientY;
+            }
+        });
+        
+        window.addEventListener('click', (e) => {
+            if (e.target.closest('.modal-btn') || e.target.closest('#endGameBtn') || e.target.closest('button:not(.target-btn)')) return;
+            if (state.mode === 'TOUCH' && (state.questionActive || document.getElementById('tutorialScreen').classList.contains('hidden')===false)) {
+                triggerShot(e.clientX, e.clientY);
+            }
+        });
+
+        function triggerShot(targetX, targetY) {
+            if (state.isPaused) return;
+            audio.playLaser();
+            state.lasers.push({ x1: window.innerWidth * 0.5, y1: window.innerHeight, x2: targetX, y2: targetY, alpha: 1.0 });
+            createImpactParticles(targetX, targetY);
+
+            // Tutorial Check
+            if (!document.getElementById('tutorialScreen').classList.contains('hidden')) {
+                const diag = document.getElementById('tutorialDiagram');
+                if (diag) {
+                    const rect = diag.getBoundingClientRect();
+                    if (targetX >= rect.left && targetX <= rect.right && targetY >= rect.top && targetY <= rect.bottom) {
+                        audio.playCorrect();
+                        diag.textContent = "💥";
+                        document.getElementById('tutorialFeedback').textContent = "PERFECT SHOT! STARTING GAME...";
+                        setTimeout(() => startStageSequence(0), 1200);
+                    }
+                }
+                return;
+            }
+
+            // Gameplay Hit Check on Moving Targets using current bounding rects
+            if (!state.questionActive) return;
+            
+            let hitIndex = -1;
+            let hitElement = null;
+
+            elems.targetBtns.forEach((btn, idx) => {
+                const rect = btn.getBoundingClientRect();
+                if (targetX >= rect.left && targetX <= rect.right && targetY >= rect.top && targetY <= rect.bottom) {
+                    hitIndex = idx;
+                    hitElement = btn;
+                }
+            });
+
+            if (hitIndex !== -1) {
+                verifyAnswer(hitIndex, hitElement);
+            }
+        }
+
+        function createImpactParticles(x, y) {
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 4 + Math.random() * 8;
+                state.particles.push({
+                    x: x, y: y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
+                    radius: 2 + Math.random() * 5, color: Math.random() > 0.5 ? '#00f0ff' : '#ffd700', alpha: 1.0
+                });
+            }
+        }
+
+        function verifyAnswer(selectedIndex, targetElement) {
+            if (!state.questionActive || state.isPaused) return;
+
+            // Only count as attempted the first time they shoot at the current question
+            if (!state.attemptedCurrentQuestion) {
+                state.totalAttempts++;
+                state.attemptedCurrentQuestion = true;
+            }
+
+            if (selectedIndex === state.activeCorrectIndex) {
+                state.questionActive = false; 
+                targetElement.classList.add('correct');
+                audio.playCorrect();
+
+                const pointsGained = 100 + (state.timer * 10);
+                state.score += pointsGained;
+                state.correctCount++;
+                elems.scoreDisplay.textContent = state.score.toLocaleString();
+                
+                spawnFloatingText(`+${pointsGained} SHOT!`, state.cursor.x, state.cursor.y, '#10b981');
+
+                setTimeout(() => {
+                    targetElement.classList.remove('correct');
+                    advanceQuestion();
+                }, 1200);
+            } else {
+                targetElement.classList.add('wrong');
+                audio.playWrong();
+                spawnFloatingText("MISS!", state.cursor.x, state.cursor.y, '#ef4444');
+                setTimeout(() => targetElement.classList.remove('wrong'), 500);
+            }
+        }
+
+        function spawnFloatingText(text, x, y, color) {
+            state.floatingTexts.push({ text: text, x: x, y: y, vy: -2.5, alpha: 1.0, color: color });
+        }
+
+        function startTimer() {
+            state.timer = 10;
+            updateTimerDisplay();
+            clearInterval(state.timerInterval);
+            state.timerInterval = setInterval(() => {
+                if(state.isPaused || !state.questionActive) return;
+                state.timer--;
+                updateTimerDisplay();
+                if (state.timer <= 3 && state.timer > 0) audio.playTick();
+                if (state.timer <= 0) {
+                    clearInterval(state.timerInterval);
+                    onTimeExpired();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            elems.timerText.textContent = state.timer;
+            elems.timerCircle.style.strokeDashoffset = 138.2 * (1 - state.timer / 10);
+            if (state.timer <= 3) {
+                elems.timerCircle.className = "timer-ring-circle text-red-500 animate-pulse";
+                elems.timerText.className = "absolute font-black text-base md:text-2xl text-red-500 neon-text-red";
+            } else {
+                elems.timerCircle.className = "timer-ring-circle text-yellow-400";
+                elems.timerText.className = "absolute font-black text-base md:text-2xl text-yellow-400 neon-text-yellow";
+            }
+        }
+
+        function onTimeExpired() {
+            if (!state.questionActive) return;
+            state.questionActive = false;
+            audio.playTimesUp();
+            
+            // Highlight the correct answer if time runs out
+            const correctBtn = elems.targetBtns[state.activeCorrectIndex];
+            correctBtn.classList.add('correct');
+            spawnFloatingText("TIME'S UP!", window.innerWidth * 0.5, window.innerHeight * 0.4, '#ef4444');
+            
+            setTimeout(() => {
+                correctBtn.classList.remove('correct');
+                advanceQuestion();
+            }, 1500);
+        }
+
+        function advanceQuestion() {
+            state.currentQuestionIdx++;
+            if (state.currentQuestionIdx >= QUESTION_BANK[state.currentStageIdx].questions.length) {
+                onStageComplete();
+            } else {
+                loadQuestion();
+            }
+        }
+
+        function loadQuestion() {
+            state.attemptedCurrentQuestion = false;
+            const stageData = QUESTION_BANK[state.currentStageIdx];
+            const currentQ = stageData.questions[state.currentQuestionIdx];
+
+            document.getElementById('stageBadge').textContent = `Stage ${stageData.stage}`;
+            document.getElementById('stageNameDisplay').textContent = stageData.stageName;
+            document.getElementById('questionProgress').textContent = `${(state.currentStageIdx * 5) + state.currentQuestionIdx + 1} / ${MAX_QUESTIONS_TOTAL}`;
+            elems.questionText.textContent = currentQ.q;
+
+            // Randomise the displayed option order
+            let options = currentQ.choices.map((text, idx) => ({ text, isCorrect: idx === currentQ.correct }));
+            options.sort(() => Math.random() - 0.5);
+            state.activeCorrectIndex = options.findIndex(opt => opt.isCorrect);
+
+            // Target Falling Setup
+            const containerHeight = elems.targetsContainer.clientHeight || window.innerHeight * 0.5;
+            const baseSpeed = window.innerHeight * 0.0018; 
+            // Progressive difficulty up to stage 7
+            const speedMultipliers = [1.0, 1.3, 1.6, 2.0, 2.5, 3.2, 4.0]; 
+            state.targetSpeed = baseSpeed * speedMultipliers[state.currentStageIdx];
+
+            // Reset positions above the container
+            const startY = - (window.innerHeight * 0.25);
+            state.targetsData = [
+                {y: startY, active: true},
+                {y: startY, active: true},
+                {y: startY, active: true}
+            ];
+
+            elems.targetBtns.forEach((btn, idx) => {
+                btn.className = "target-btn absolute rounded-2xl p-3 md:p-6 flex flex-col items-center justify-center text-center min-h-[100px] md:min-h-[130px] w-[31%]";
+                if(idx === 0) btn.style.left = "1%";
+                if(idx === 1) btn.style.left = "34.5%";
+                if(idx === 2) btn.style.left = "68%";
+                
+                const textEl = btn.querySelector('.target-text');
+                const optText = options[idx].text;
+                textEl.textContent = optText;
+                
+                // Responsive text wrapping for longer answers
+                if (optText.length > 18) {
+                    textEl.className = "target-text text-sm md:text-base lg:text-xl font-black text-white break-words";
+                } else {
+                    textEl.className = "target-text text-lg md:text-2xl lg:text-3xl font-black text-white break-words";
+                }
+
+                btn.style.transform = `translateY(${startY}px)`;
+            });
+
+            state.questionActive = true;
+            startTimer();
+        }
+
+        function onStageComplete() {
+            audio.playStageComplete();
+            showScreen('stageCompleteScreen');
+            document.getElementById('stageScoreAdd').textContent = "CLEARED!";
+            document.getElementById('stageTotalScore').textContent = state.score.toLocaleString();
+        }
+
+        function startStageSequence(stageIdx) {
+            state.currentStageIdx = stageIdx;
+            state.currentQuestionIdx = 0;
+            const stageData = QUESTION_BANK[stageIdx];
+            
+            showScreen('stageIntroScreen');
+            document.getElementById('stageIntroBadge').textContent = `STAGE ${stageData.stage} OF ${TOTAL_STAGES}`;
+            
+            const titleEl = document.getElementById('stageIntroTitle');
+            const focusEl = document.getElementById('stageIntroFocus');
+
+            // Ultimate Boss Custom Intro Sequence
+            if (stageIdx === 6) {
+                audio.playBossIntro();
+                titleEl.textContent = "ULTIMATE BOSS UNLOCKED!";
+                titleEl.classList.remove('text-white');
+                titleEl.classList.add('text-red-500', 'neon-text-red');
+                focusEl.textContent = "FINAL CHALLENGE!";
+                focusEl.classList.remove('text-cyan-300');
+                focusEl.classList.add('text-red-400');
+            } else {
+                titleEl.textContent = stageData.stageName;
+                titleEl.classList.remove('text-red-500', 'neon-text-red');
+                titleEl.classList.add('text-white');
+                focusEl.textContent = `Grammar Focus: ${stageData.grammarFocus}`;
+                focusEl.classList.remove('text-red-400');
+                focusEl.classList.add('text-cyan-300');
+            }
+
+            let count = 3;
+            document.getElementById('stageCountdownNum').textContent = count;
+            document.getElementById('stageIntroStatus').textContent = "GET READY!";
+            if(stageIdx !== 6) audio.playBeep(440, 0.1);
+
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    document.getElementById('stageCountdownNum').textContent = count;
+                    audio.playBeep(440, 0.1);
+                } else if (count === 0) {
+                    document.getElementById('stageCountdownNum').textContent = "GO!";
+                    document.getElementById('stageIntroStatus').textContent = "BLAST THE ANSWERS!";
+                    audio.playBeep(880, 0.25);
+                } else {
+                    clearInterval(interval);
+                    showScreen('gameplayScreen');
+                    loadQuestion();
+                }
+            }, 900);
+        }
+
+        function startTutorial() {
+            showScreen('tutorialScreen');
+            audio.init();
+        }
+
+        // ==========================================
+        // GOOGLE SHEETS INTEGRATION LOGIC
+        // ==========================================
+
+        function setGoogleSaveStatus(status, message) {
+            elems.saveStatusText.textContent = message;
+            elems.saveStatusIndicator.className = "w-2.5 h-2.5 rounded-full";
+            
+            if(status === 'SAVING') {
+                elems.saveStatusIndicator.classList.add('bg-yellow-500', 'animate-pulse');
+                elems.saveStatusBorder.className = "absolute left-0 top-0 bottom-0 w-1 bg-yellow-500";
+                elems.saveStatusText.className = "text-sm md:text-base font-black text-yellow-400 tracking-widest";
+                elems.retrySaveBtn.classList.add('hidden');
+            } else if (status === 'SAVED') {
+                elems.saveStatusIndicator.classList.add('bg-emerald-500');
+                elems.saveStatusBorder.className = "absolute left-0 top-0 bottom-0 w-1 bg-emerald-500";
+                elems.saveStatusText.className = "text-sm md:text-base font-black text-emerald-400 tracking-widest";
+                elems.retrySaveBtn.classList.add('hidden');
+            } else if (status === 'FAILED') {
+                elems.saveStatusIndicator.classList.add('bg-red-500');
+                elems.saveStatusBorder.className = "absolute left-0 top-0 bottom-0 w-1 bg-red-500";
+                elems.saveStatusText.className = "text-sm md:text-base font-black text-red-500 tracking-widest";
+                elems.retrySaveBtn.classList.remove('hidden');
+            }
+        }
+
+        async function submitScoreToGoogleSheets() {
+            if (!GOOGLE_SCRIPT_WEB_APP_URL) {
+                setGoogleSaveStatus('FAILED', 'URL NOT CONFIGURED');
+                console.error("Missing GOOGLE_SCRIPT_WEB_APP_URL");
+                return;
+            }
+
+            setGoogleSaveStatus('SAVING', 'SAVING RESULTS...');
+            
+            try {
+                // We use text/plain to avoid preflight (OPTIONS) requests causing CORS issues in Apps Script.
+                const response = await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(state.saveDataPending)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    setGoogleSaveStatus('SAVED', 'RESULTS SAVED!');
+                } else if (result.message === 'Already saved') {
+                    setGoogleSaveStatus('SAVED', 'ALREADY SAVED!');
+                } else {
+                    console.error("Google Sheets Error:", result.message);
+                    setGoogleSaveStatus('FAILED', 'SAVE FAILED - RETRY');
+                }
+            } catch (err) {
+                console.error("Network Fetch Error:", err);
+                setGoogleSaveStatus('FAILED', 'NETWORK ERROR - RETRY');
+            }
+        }
+
+        elems.retrySaveBtn.addEventListener('click', () => {
+            if(state.saveDataPending) {
+                submitScoreToGoogleSheets();
+            }
+        });
+
+        function showFinalResults() {
+            showScreen('resultsScreen');
+
+            const isComplete = !state.endedEarly && state.currentStageIdx === (TOTAL_STAGES - 1) && state.currentQuestionIdx >= 4;
+            const stageReached = state.currentStageIdx + (isComplete ? 1 : 0);
+            const gameStatusStr = isComplete ? "COMPLETED" : "ENDED EARLY";
+            const acc = state.totalAttempts > 0 ? Math.round((state.correctCount / state.totalAttempts) * 100) : 0;
+            const nameToSave = state.playerName || "Pupil";
+
+            // Update UI
+            document.getElementById('resMissionTitle').textContent = isComplete ? "MISSION COMPLETED!" : "GAME ENDED!";
+            document.getElementById('resStatus').textContent = gameStatusStr;
+            document.getElementById('resPlayerName').textContent = nameToSave;
+            document.getElementById('resTotalScore').textContent = state.score.toLocaleString();
+            document.getElementById('resCorrect').textContent = `${state.correctCount} / ${MAX_QUESTIONS_TOTAL}`;
+            document.getElementById('resAccuracy').textContent = `${acc}%`;
+            document.getElementById('resStages').textContent = `${stageReached} / ${TOTAL_STAGES}`;
+
+            let rankTitle = "BRAVE BEGINNER";
+            let rankSub = "Keep practicing!";
+            if (acc >= 90) { rankTitle = "PAST TENSE MASTER 🏆"; rankSub = "Perfect Grammar Mastery!"; }
+            else if (acc >= 70) { rankTitle = "SUPER SHOOTER ⚡"; rankSub = "Great Knowledge!"; }
+            else if (acc >= 50) { rankTitle = "GRAMMAR EXPLORER 🌟"; rankSub = "Good effort!"; }
+
+            document.getElementById('finalRankTitle').textContent = rankTitle;
+            document.getElementById('finalRankSub').textContent = rankSub;
+
+            // Prepare Payload for Google Sheets
+            state.saveDataPending = {
+                submissionId: state.sessionId,
+                playerName: nameToSave,
+                totalScore: state.score,
+                correctAnswers: state.correctCount,
+                questionsAttempted: state.totalAttempts,
+                accuracy: acc,
+                stageReached: stageReached,
+                gameStatus: gameStatusStr
+            };
+
+            // Trigger Automatic Google Sheets Save
+            submitScoreToGoogleSheets();
+        }
+
+        function showScreen(screenId) {
+            const screens = ['startScreen', 'tutorialScreen', 'stageIntroScreen', 'gameplayScreen', 'stageCompleteScreen', 'resultsScreen'];
+            screens.forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+
+            if (screenId === 'gameplayScreen' || screenId === 'resultsScreen') {
+                elems.hudHeader.classList.remove('hidden');
+                if(screenId === 'resultsScreen') document.getElementById('endGameBtn').classList.add('hidden');
+                else document.getElementById('endGameBtn').classList.remove('hidden');
+            } else {
+                elems.hudHeader.classList.add('hidden');
+            }
+        }
+
+        function setMode(mode) {
+            state.mode = mode;
+            if (mode === 'AR') {
+                document.getElementById('modeArBtn').className = "flex-1 py-3 px-3 rounded-xl border-2 border-cyan-400 bg-cyan-500/30 text-cyan-300 font-extrabold text-xs md:text-sm flex items-center justify-center gap-2 transition-all shadow-lg";
+                document.getElementById('modeTouchBtn').className = "flex-1 py-3 px-3 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-400 font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all";
+                elems.webcam.style.opacity = "0.85";
+            } else {
+                document.getElementById('modeTouchBtn').className = "flex-1 py-3 px-3 rounded-xl border-2 border-cyan-400 bg-cyan-500/30 text-cyan-300 font-extrabold text-xs md:text-sm flex items-center justify-center gap-2 transition-all shadow-lg";
+                document.getElementById('modeArBtn').className = "flex-1 py-3 px-3 rounded-xl border-2 border-slate-700 bg-slate-900/70 text-slate-400 font-bold text-xs md:text-sm flex items-center justify-center gap-2 transition-all";
+                elems.webcam.style.opacity = "0.15";
+            }
+            updateGestureHUD();
+        }
+
+        // --- BUTTON EVENTS ---
+        document.getElementById('startGameBtn').addEventListener('click', async () => {
+            audio.init();
+            state.sessionId = generateSessionId(); 
+            state.saveDataPending = null;
+            state.playerName = elems.playerNameInput.value.trim() || "Pupil";
+            state.score = 0; state.correctCount = 0; state.totalAttempts = 0;
+            state.endedEarly = false;
+            
+            if (state.mode === 'AR') await startARMode();
+            else startStageSequence(0);
+        });
+
+        document.getElementById('modeArBtn').addEventListener('click', () => setMode('AR'));
+        document.getElementById('modeTouchBtn').addEventListener('click', () => setMode('TOUCH'));
+        document.getElementById('skipTutorialBtn').addEventListener('click', () => startStageSequence(0));
+        
+        document.getElementById('nextStageBtn').addEventListener('click', () => {
+            if (state.currentStageIdx + 1 < QUESTION_BANK.length) startStageSequence(state.currentStageIdx + 1);
+            else showFinalResults();
+        });
+
+        document.getElementById('playAgainBtn').addEventListener('click', () => {
+            state.sessionId = generateSessionId(); 
+            state.saveDataPending = null;
+            state.score = 0; state.correctCount = 0; state.totalAttempts = 0; state.endedEarly = false;
+            startStageSequence(0);
+        });
+        document.getElementById('backHomeBtn').addEventListener('click', () => showScreen('startScreen'));
+
+        // END GAME FLOW
+        document.getElementById('endGameBtn').addEventListener('click', () => {
+            state.isPaused = true;
+            elems.endGameModal.classList.remove('hidden');
+        });
+        document.getElementById('cancelEndBtn').addEventListener('click', () => {
+            state.isPaused = false;
+            elems.endGameModal.classList.add('hidden');
+        });
+        document.getElementById('confirmEndBtn').addEventListener('click', () => {
+            state.endedEarly = true;
+            state.questionActive = false;
+            clearInterval(state.timerInterval);
+            elems.endGameModal.classList.add('hidden');
+            showFinalResults();
+        });
+
+        // CERTIFICATE GENERATION LOGIC
+        async function generateCertificate(format) {
+            const btn = format === 'pdf' ? document.getElementById('dlPdfBtn') : document.getElementById('dlPngBtn');
+            const origHTML = btn.innerHTML;
+            btn.innerHTML = "⏳ GENERATING...";
+            btn.disabled = true;
+
+            try {
+                // Populate template data
+                document.getElementById('certPlayerName').textContent = state.playerName || "Pupil";
+                document.getElementById('certScore').textContent = state.score.toLocaleString();
+                document.getElementById('certCorrect').textContent = `${state.correctCount}/${MAX_QUESTIONS_TOTAL}`;
+                
+                const isComplete = !state.endedEarly && state.currentStageIdx === (TOTAL_STAGES - 1) && state.currentQuestionIdx >= 4;
+                const stageReached = state.currentStageIdx + (isComplete ? 1 : 0);
+                document.getElementById('certStages').textContent = `${stageReached}/${TOTAL_STAGES}`;
+                
+                document.getElementById('certStatus').textContent = state.endedEarly ? "ENDED EARLY" : "COMPLETED";
+                document.getElementById('certDate').textContent = new Date().toLocaleDateString();
+
+                const node = document.getElementById('certificateNode');
+                
+                const canvas = await html2canvas(node, {
+                    scale: 2, 
+                    backgroundColor: '#030712',
+                    logging: false
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const filename = `Past_Tense_Finger_Blaster_${(state.playerName||"Pupil").replace(/\s+/g,'_')}_Certificate`;
+
+                if (format === 'png') {
+                    const link = document.createElement('a');
+                    link.download = `${filename}.png`;
+                    link.href = imgData;
+                    link.click();
+                } else if (format === 'pdf') {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('l', 'pt', 'a4');
+                    pdf.addImage(imgData, 'PNG', 0, 0, 842, 595);
+                    pdf.save(`${filename}.pdf`);
+                }
+            } catch (err) {
+                console.error("Certificate Generation Error:", err);
+                alert("Failed to generate certificate. Please try again.");
+            } finally {
+                btn.innerHTML = origHTML;
+                btn.disabled = false;
+            }
+        }
+
+        document.getElementById('dlPdfBtn').addEventListener('click', () => generateCertificate('pdf'));
+        document.getElementById('dlPngBtn').addEventListener('click', () => generateCertificate('png'));
+
+        // CONTINUOUS RENDER LOOP (Target Physics, Collisions, Visuals)
+        function renderLoop() {
+            canvasCtx.clearRect(0, 0, elems.gameCanvas.width, elems.gameCanvas.height);
+
+            // Animate Falling Targets
+            if (state.questionActive && !state.isPaused) {
+                const containerRect = elems.targetsContainer.getBoundingClientRect();
+                const time = Date.now() / 1000;
+                
+                elems.targetBtns.forEach((btn, idx) => {
+                    if(state.targetsData[idx].active) {
+                        state.targetsData[idx].y += state.targetSpeed;
+                        
+                        // Check hovering via coordinates
+                        const bRect = btn.getBoundingClientRect();
+                        const isHovered = (state.cursor.x >= bRect.left && state.cursor.x <= bRect.right &&
+                                         state.cursor.y >= bRect.top && state.cursor.y <= bRect.bottom);
+                        
+                        if(isHovered) btn.classList.add('hovered');
+                        else btn.classList.remove('hovered');
+
+                        // Recycle Target if it goes off bottom while timer is still running
+                        if (state.targetsData[idx].y > containerRect.height + 20) {
+                            state.targetsData[idx].y = - (bRect.height + 50);
+                        }
+                        
+                        // Horizontal Sway logic for Stages 6 & 7 (idx 5 & 6)
+                        let offsetX = 0;
+                        if (state.currentStageIdx >= 5) {
+                            // Max amplitude 1.5% of window width (keeps targets in lane constraints)
+                            const amplitude = window.innerWidth * 0.015; 
+                            const speed = state.currentStageIdx === 6 ? 3 : 1.5; 
+                            // Phase shift based on index to make them sway independently
+                            offsetX = Math.sin(time * speed + idx * Math.PI/2) * amplitude;
+                        }
+
+                        // Apply movement 
+                        const scaleStr = btn.classList.contains('hovered') ? ' scale(1.04)' : '';
+                        btn.style.transform = `translate(${offsetX}px, ${state.targetsData[idx].y}px)${scaleStr}`;
+                    }
+                });
+            }
+
+            // Render Lasers
+            for (let i = state.lasers.length - 1; i >= 0; i--) {
+                const laser = state.lasers[i];
+                canvasCtx.save();
+                canvasCtx.strokeStyle = `rgba(0, 240, 255, ${laser.alpha})`;
+                canvasCtx.shadowColor = '#00f0ff';
+                canvasCtx.shadowBlur = 16;
+                canvasCtx.lineWidth = 7;
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(laser.x1, laser.y1);
+                canvasCtx.lineTo(laser.x2, laser.y2);
+                canvasCtx.stroke();
+                canvasCtx.restore();
+                laser.alpha -= 0.08;
+                if (laser.alpha <= 0) state.lasers.splice(i, 1);
+            }
+
+            // Render Impact Particles
+            for (let i = state.particles.length - 1; i >= 0; i--) {
+                const p = state.particles[i];
+                if(!state.isPaused) {
+                    p.x += p.vx; p.y += p.vy; p.alpha -= 0.04;
+                }
+                canvasCtx.save();
+                canvasCtx.fillStyle = p.color;
+                canvasCtx.globalAlpha = Math.max(0, p.alpha);
+                canvasCtx.beginPath();
+                canvasCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                canvasCtx.fill();
+                canvasCtx.restore();
+                if (p.alpha <= 0) state.particles.splice(i, 1);
+            }
+
+            // Render Floating Text
+            for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+                const ft = state.floatingTexts[i];
+                if(!state.isPaused) {
+                    ft.y += ft.vy; ft.alpha -= 0.02;
+                }
+                canvasCtx.save();
+                canvasCtx.font = '900 30px Outfit, sans-serif';
+                canvasCtx.fillStyle = ft.color;
+                canvasCtx.shadowColor = '#000';
+                canvasCtx.shadowBlur = 12;
+                canvasCtx.globalAlpha = Math.max(0, ft.alpha);
+                canvasCtx.textAlign = 'center';
+                canvasCtx.fillText(ft.text, ft.x, ft.y);
+                canvasCtx.restore();
+                if (ft.alpha <= 0) state.floatingTexts.splice(i, 1);
+            }
+
+            // Render Glow Crosshair
+            if (state.handDetected || state.mode === 'TOUCH') {
+                const cx = state.cursor.x, cy = state.cursor.y;
+                canvasCtx.save();
+                canvasCtx.translate(cx, cy);
+
+                const isFiring = state.gestureState === 'TRIGGER_PRESSED' || state.gestureState === 'SHOT_FIRED';
+                canvasCtx.strokeStyle = isFiring ? '#10b981' : '#00f0ff';
+                canvasCtx.shadowColor = isFiring ? '#10b981' : '#00f0ff';
+                canvasCtx.shadowBlur = 14;
+                canvasCtx.lineWidth = 3.5;
+
+                canvasCtx.beginPath();
+                canvasCtx.arc(0, 0, isFiring ? 22 : 28, 0, Math.PI * 2);
+                canvasCtx.stroke();
+
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(-14, 0); canvasCtx.lineTo(-5, 0);
+                canvasCtx.moveTo(5, 0); canvasCtx.lineTo(14, 0);
+                canvasCtx.moveTo(0, -14); canvasCtx.lineTo(0, -5);
+                canvasCtx.moveTo(0, 5); canvasCtx.lineTo(0, 14);
+                canvasCtx.stroke();
+                
+                canvasCtx.fillStyle = '#ffffff';
+                canvasCtx.beginPath(); canvasCtx.arc(0, 0, 4, 0, Math.PI * 2); canvasCtx.fill();
+                canvasCtx.restore();
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+        window.onload = function() {
+            setMode('AR');
+            requestAnimationFrame(renderLoop);
+        };
+    </script>
+</body>
+</html>
